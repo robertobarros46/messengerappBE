@@ -26,9 +26,9 @@ public class ChatRepositoryImpl implements ChatRepository {
         List<Put> putList = new ArrayList<>();
         String chatId = UUID.randomUUID().toString();
         for (String u: userId) {
-            Chat chatInfo = new Chat(chatId, chatName, u);
+            Chat chat = new Chat(chatId, chatName, u);
             Put put = new Put(Bytes.toBytes(UUID.randomUUID().toString()));
-            mapperChatInfo(chatInfo, put);
+            mapperChat(chat, put);
             putList.add(put);
         }
 
@@ -39,8 +39,8 @@ public class ChatRepositoryImpl implements ChatRepository {
     }
 
     @Override
-    public void createChat(Chat chatInfo) {
-        saveChat(chatInfo);
+    public void createChat(Chat chat) {
+        saveChat(chat);
     }
 
     @Override
@@ -68,9 +68,9 @@ public class ChatRepositoryImpl implements ChatRepository {
 
     }
 
-    private void saveChat(Chat chatInfo) {
+    private void saveChat(Chat chat) {
         Put put = new Put(Bytes.toBytes(UUID.randomUUID().toString()));
-        mapperChatInfo(chatInfo, put);
+        mapperChat(chat, put);
 
         hbaseTemplate.execute(ConstantsUtils.CHAT_TABLE, hTableInterface -> {
             hTableInterface.put(put);
@@ -78,16 +78,16 @@ public class ChatRepositoryImpl implements ChatRepository {
         });
     }
 
-    private void mapperChatInfo(Chat chatInfo, Put put) {
+    private void mapperChat(Chat chat, Put put) {
         put.add(Chat.columnFamillyChatAsBytes,
                 Chat.chatIdAsBytes,
-                Bytes.toBytes(chatInfo.getChatId()));
+                Bytes.toBytes(chat.getChatId()));
         put.add(Chat.columnFamillyChatAsBytes,
                 Chat.chatNameAsBytes,
-                Bytes.toBytes(chatInfo.getChatName()));
+                Bytes.toBytes(chat.getChatName()));
         put.add(Chat.columnFamillyChatAsBytes,
                 Chat.userIdAsBytes,
-                Bytes.toBytes(chatInfo.getUserId()));
+                Bytes.toBytes(chat.getUserId()));
     }
 
     @Override
@@ -96,7 +96,7 @@ public class ChatRepositoryImpl implements ChatRepository {
                 Chat.chatIdAsBytes,
                 CompareFilter.CompareOp.EQUAL,
                 new BinaryComparator(Bytes.toBytes(chatId)));
-        return findChatInfoByFilter(filter);
+        return findChatByFilter(filter);
     }
 
     @Override
@@ -107,17 +107,17 @@ public class ChatRepositoryImpl implements ChatRepository {
                 new BinaryComparator(Bytes.toBytes(userId)));
         filter.setFilterIfMissing(true);
 
-        return findChatInfoByFilter(filter);
+        return findChatByFilter(filter);
     }
 
-    private List<Chat> findChatInfoByFilter(Filter filter) {
+    private List<Chat> findChatByFilter(Filter filter) {
         Scan scan = new Scan();
         scan.setFilter(filter);
         scan.addFamily(Chat.columnFamillyChatAsBytes);
-        return findChatInfoByScan(scan);
+        return findChatByScan(scan);
     }
 
-    private List<Chat> findChatInfoByScan(Scan scan) {
+    private List<Chat> findChatByScan(Scan scan) {
         return hbaseTemplate.find(ConstantsUtils.CHAT_TABLE, scan, (result, i) ->
                 Chat.bytesToChat(result.getValue(Chat.columnFamillyChatAsBytes, Chat.chatIdAsBytes),
                     result.getValue(Chat.columnFamillyChatAsBytes, Chat.chatNameAsBytes),

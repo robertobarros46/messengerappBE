@@ -49,7 +49,7 @@ public class MessageRepositoryImpl implements MessageRepository {
 
     private void saveMessage(Message message) {
         Put put = new Put(Bytes.toBytes(message.getMessageId()));
-        mapperMessageInfo(message, put);
+        mapperMessage(message, put);
         saveMessage(put);
     }
 
@@ -60,7 +60,7 @@ public class MessageRepositoryImpl implements MessageRepository {
         });
     }
 
-    private void mapperMessageInfo(Message message, Put put) {
+    private void mapperMessage(Message message, Put put) {
         put.add(Message.columnFamillyMessageAsBytes,
                 Message.messageIdAsBytes,
                 Bytes.toBytes(message.getMessageId()));
