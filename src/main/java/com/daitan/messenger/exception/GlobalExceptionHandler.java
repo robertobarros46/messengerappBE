@@ -24,4 +24,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<VndErrors> sqlException(final UserNotFoundException e) {
         return error(e.getErrMsg(), HttpStatus.INTERNAL_SERVER_ERROR, e.getErrCode());
     }
+
+    @ExceptionHandler(UserInvalidException.class)
+    public ResponseEntity<VndErrors> sqlException(final UserInvalidException e) {
+        return error(e.getErrMsg(), HttpStatus.BAD_REQUEST, e.getErrCode());
+    }
+
+    @ExceptionHandler(UserAlreadyExistsException.class)
+    public ResponseEntity<VndErrors> sqlException(final UserAlreadyExistsException e) {
+        return error(e.getErrMsg(), HttpStatus.CONFLICT, e.getErrCode());
+    }
 }

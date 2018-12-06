@@ -6,20 +6,21 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import javax.validation.constraints.Email;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Size;
+import java.util.Objects;
 
 
 @Document(collection = "User")
 public class User {
 
     @Id
-    private String id;
+    private String _id;
 
     @NotBlank
     @Size(max = 40)
-    private String nome;
+    private String name;
 
     @NotBlank
-    private String sobrenome;
+    private String lastName;
 
     @NotBlank
     @Size(max = 40)
@@ -35,36 +36,36 @@ public class User {
     public User() {
     }
 
-    public User(String nome, String sobrenome, String email, String password, String role) {
-        this.nome = nome;
-        this.sobrenome = sobrenome;
+    public User(String name, String lastName, String email, String password, String role) {
+        this.name = name;
+        this.lastName = lastName;
         this.email = email;
         this.password = password;
         this.role = role;
     }
 
     public String getId() {
-        return id;
+        return _id;
     }
 
-    public void setId(String id) {
-        this.id = id;
+    public void setId(String _id) {
+        this._id = _id;
     }
 
-    public String getNome() {
-        return nome;
+    public String getName() {
+        return name;
     }
 
-    public void setNome(String nome) {
-        this.nome = nome;
+    public void setName(String name) {
+        this.name = name;
     }
 
-    public String getSobrenome() {
-        return sobrenome;
+    public String getLastName() {
+        return lastName;
     }
 
-    public void setSobrenome(String sobrenome) {
-        this.sobrenome = sobrenome;
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
     }
 
     public String getEmail() {
@@ -89,5 +90,31 @@ public class User {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        User user = (User) o;
+        return _id == user._id &&
+                Objects.equals(email, user.email);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(_id, email);
+    }
+
+    @Override
+    public String toString() {
+        return "User{" +
+                "_id='" + _id + '\'' +
+                ", name='" + name + '\'' +
+                ", lastName='" + lastName + '\'' +
+                ", email='" + email + '\'' +
+                ", password='" + password + '\'' +
+                ", role='" + role + '\'' +
+                '}';
     }
 }

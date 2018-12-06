@@ -2,6 +2,8 @@ package com.daitan.messenger.users.controller;
 
 import com.daitan.messenger.constants.ConstantsUtils;
 import com.daitan.messenger.exception.SQLException;
+import com.daitan.messenger.exception.UserAlreadyExistsException;
+import com.daitan.messenger.exception.UserInvalidException;
 import com.daitan.messenger.exception.UserNotFoundException;
 import com.daitan.messenger.login.CurrentUser;
 import com.daitan.messenger.login.model.UserPrincipal;
@@ -9,8 +11,13 @@ import com.daitan.messenger.message.model.Chat;
 import com.daitan.messenger.message.model.Message;
 import com.daitan.messenger.message.service.ChatService;
 import com.daitan.messenger.message.service.MessageService;
-import com.daitan.messenger.users.model.*;
+import com.daitan.messenger.users.model.PagedResponse;
+import com.daitan.messenger.users.model.User;
+import com.daitan.messenger.users.model.UserIdentityAvailability;
+import com.daitan.messenger.users.model.UserProfile;
+import com.daitan.messenger.users.model.UserSummary;
 import com.daitan.messenger.users.service.UserService;
+import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.hateoas.Resource;
@@ -23,7 +30,12 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
 
 @RestController
 @EnableWebMvc
@@ -37,9 +49,6 @@ public class UserController {
     private ChatService chatService;
 
     private MessageService messageService;
-//
-//    @Autowired
-//    private SessionRegistry sessionRegistry;
 
     public UserController(UserService userService, ChatService chatService, MessageService messageService) {
         this.userService = userService;
@@ -47,29 +56,6 @@ public class UserController {
         this.messageService = messageService;
     }
 
-
-//    @PreAuthorize("hasRole('USER') OR hasRole('ADMIN')")
-//    @RequestMapping(value = "/users/loggedusers", method = RequestMethod.GET)
-//    public List<Object> getLoggedUsers() {
-//        List<Object> principals = sessionRegistry.getAllPrincipals();
-//        return principals;
-//    }
-//
-//    @PreAuthorize("hasRole('USER') OR hasRole('ADMIN')")
-//    @RequestMapping(value = "/users/logout/{email:.+}", method = RequestMethod.GET)
-//    public String killUserSession(@PathVariable(value = "email") String email) {
-//        for (Object principal : sessionRegistry.getAllPrincipals()) {
-//            UserDetails userDetails = (UserDetails) principal;
-//            if (userDetails.getUsername().equals(email)) {
-//                sessionRegistry.getAllPrincipals().remove(principal);
-//                for (SessionInformation information : sessionRegistry.getAllSessions(userDetails, true)) {
-//                    sessionRegistry.removeSessionInformation(information.getSessionId());
-//                    information.expireNow();
-//                }
-//            }
-//        }
-//        return "Session killed for user: " + email;
-//    }
 
     @PreAuthorize("hasRole('USER') OR hasRole('ADMIN')")
     @RequestMapping(value = "/users/current", method = RequestMethod.GET)
@@ -89,12 +75,13 @@ public class UserController {
         }
     }
 
+    @PreAuthorize("hasRole('USER') OR hasRole('ADMIN')")
     @RequestMapping(value = "/users/{email:.+}", method = RequestMethod.GET)
     public UserProfile getUserProfile(@PathVariable(value = "email") String email) {
         try {
             Optional<User> userOptional = userService.findByEmail(email);
             User user = userOptional.orElseThrow(() -> new UserNotFoundException("404", "User not found please try again!!"));
-            UserProfile userProfile = new UserProfile(user.getId(), user.getEmail(), user.getNome(), user.getRole());
+            UserProfile userProfile = new UserProfile(user.getId(), user.getEmail(), user.getName(), user.getRole());
             return userProfile;
         } catch (SQLException e) {
             logger.error("Couldn't perform database operation");
@@ -104,11 +91,13 @@ public class UserController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @RequestMapping(value = "/users", method = RequestMethod.GET)
-    public ResponseEntity<PagedResponse<UserProfile>> getAllUsers(
+    public ResponseEntity<PagedResponse<UserProfile>> getUsers(
+            @RequestParam(value = "name", defaultValue = ConstantsUtils.EMPTY_STRING) String name,
+            @RequestParam(value = "lastName", defaultValue = ConstantsUtils.EMPTY_STRING) String lastName,
             @RequestParam(value = "page", defaultValue = ConstantsUtils.DEFAULT_PAGE_NUMBER) int page,
             @RequestParam(value = "size", defaultValue = ConstantsUtils.DEFAULT_PAGE_SIZE) int size) {
         try {
-            PagedResponse<UserProfile> userProfiles = this.userService.findAll(page, size);
+            PagedResponse<UserProfile> userProfiles = this.userService.findByNameAndOrLastName(name, lastName, page, size);
             return new ResponseEntity<>(userProfiles, HttpStatus.PARTIAL_CONTENT);
         } catch (SQLException e) {
             logger.error("Couldn't perform database operation");
@@ -118,7 +107,14 @@ public class UserController {
 
     @RequestMapping(value = "/users", method = RequestMethod.POST, headers = "Accept=application/json")
     public ResponseEntity<User> createUser(@RequestBody User user) {
+        if(Objects.isNull(user)|| Strings.isBlank(user.getEmail())  || Strings.isBlank(user.getPassword()) || Strings.isBlank(user.getName())) {
+            logger.error("Invalid user");
+            throw new UserInvalidException("403", "User is invalid, please check if all necessary fields are filled");
+        }
         try {
+            if (userService.findByEmail(user.getEmail()).isPresent()) {
+                throw new UserAlreadyExistsException("409", "User with this email already exists!");
+            }
             this.userService.insert(user);
         } catch (SQLException e) {
             logger.error("Couldn't insert user in database");
@@ -162,10 +158,22 @@ public class UserController {
         }
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
+    @RequestMapping(value = "/chats/messages", method = RequestMethod.GET)
+    public ResponseEntity<PagedResponse<Message>> findAllMessages(
+            @RequestParam(value = "emitter", defaultValue = ConstantsUtils.EMPTY_STRING) String emitter,
+            @RequestParam(value = "receptor", defaultValue = ConstantsUtils.EMPTY_STRING) String receptor,
+            @RequestParam(value = "page", defaultValue = ConstantsUtils.DEFAULT_PAGE_NUMBER) int page,
+            @RequestParam(value = "size", defaultValue = ConstantsUtils.DEFAULT_PAGE_SIZE) int size){
+        PagedResponse message = messageService.findAllMessages(emitter, receptor, page, size);
+        message.getContent().sort(Comparator.comparing(Message::getTimestamp));
+        return new ResponseEntity<>(message, HttpStatus.PARTIAL_CONTENT);
+    }
+
     @RequestMapping(value = "/chats/{chatId}/messages", method = RequestMethod.GET)
-    public HttpEntity<Resources<Resource<Message>>> findMessages(@PathVariable("chatId") String chatId){
+    public HttpEntity<Resources<Resource<Message>>> findMessagesByChatId(@PathVariable("chatId") String chatId){
         List<Message> message = messageService.findMessageByChatId(chatId);
-        Collections.sort(message, Comparator.comparing(Message::getTimestamp));
+        message.sort(Comparator.comparing(Message::getTimestamp));
         return new ResponseEntity(new Resources(message), HttpStatus.ACCEPTED);
     }
 

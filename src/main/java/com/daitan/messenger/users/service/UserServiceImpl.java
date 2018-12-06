@@ -4,11 +4,16 @@ import com.daitan.messenger.users.model.PagedResponse;
 import com.daitan.messenger.users.model.User;
 import com.daitan.messenger.users.model.UserProfile;
 import com.daitan.messenger.users.repository.UserRepository;
+import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.repository.support.PageableExecutionUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -21,14 +26,16 @@ import java.util.stream.Collectors;
 public class UserServiceImpl implements UserService {
 
     private UserRepository userRepository;
+    private MongoTemplate mongoTemplate;
 
     @Autowired
     PasswordEncoder passwordEncoder;
 
 
     @Autowired
-    public UserServiceImpl(UserRepository userRepository) {
+    public UserServiceImpl(UserRepository userRepository, MongoTemplate mongoTemplate) {
         this.userRepository = userRepository;
+        this.mongoTemplate = mongoTemplate;
     }
 
     @Override
@@ -59,38 +66,51 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public PagedResponse<UserProfile> findAll(int page, int size) {
-
-        // Retrieve Users
-        Pageable pageable = PageRequest.of(page, size, Sort.Direction.ASC, "email");
-        Page<User> users = userRepository.findAll(pageable);
-
-        //Return empty PagedResponse in case there is no user
-        if (users.getNumberOfElements() == 0) {
-            return new PagedResponse<>(Collections.emptyList(), users.getNumber(),
-                    users.getSize(), users.getTotalElements(), users.getTotalPages(), users.isLast());
-
-        }
-
-        //mapping Users to UserProfiles
-        List<UserProfile> userProfiles = users.stream()
-                .map(user -> new UserProfile(user.getId(), user.getEmail(), user.getNome(), user.getRole()))
-                .collect(Collectors.toList());
-
-
-        return new PagedResponse<>(userProfiles, users.getNumber(),
-                users.getSize(), users.getTotalElements(), users.getTotalPages(), users.isLast());
-    }
-
-    @Override
     public boolean existsByEmail(String email) {
         return userRepository.existsByEmail(email);
     }
 
     @Override
     public Optional<User> findByEmail(String email) {
-        Optional<User> user =  userRepository.findByEmail(email);
-        return user;
+        return userRepository.findByEmail(email);
+    }
+
+    @Override
+    public PagedResponse<UserProfile> findByNameAndOrLastName(String name, String lastName, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.Direction.ASC, "email");
+        PagedResponse pagedResponse;
+        Page<User> usersPage;
+        if(Strings.isBlank(name) && Strings.isBlank(lastName)){
+            usersPage = userRepository.findAll(pageable);
+        }else{
+            Query query = new Query().with(pageable);
+            query.addCriteria(Criteria.where("name").is(name));
+            List<User> users = mongoTemplate.find(query, User.class);
+            usersPage = PageableExecutionUtils.getPage(
+                    users,
+                    pageable,
+                    () -> mongoTemplate.count(query, User.class));
+        }
+
+        pagedResponse = getPagedResponse(usersPage);
+
+        return pagedResponse;
+    }
+
+    private PagedResponse getPagedResponse(Page<User> usersPage) {
+        PagedResponse pagedResponse;
+        if (usersPage.getNumberOfElements() == 0) {
+            pagedResponse = new PagedResponse<>(Collections.emptyList(), usersPage.getNumber(),
+                    usersPage.getSize(), usersPage.getTotalElements(), usersPage.getTotalPages(), usersPage.isLast());
+
+        }else {
+            List<UserProfile> userProfiles = usersPage.stream()
+                    .map(user -> new UserProfile(user.getId(), user.getEmail(), user.getName(), user.getRole()))
+                    .collect(Collectors.toList());
+            pagedResponse = new PagedResponse<>(userProfiles, usersPage.getNumber(),
+                    usersPage.getSize(), usersPage.getTotalElements(), usersPage.getTotalPages(), usersPage.isLast());
+        }
+        return pagedResponse;
     }
 
     @Override

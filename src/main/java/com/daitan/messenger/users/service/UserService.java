@@ -20,11 +20,11 @@ public interface UserService {
 
     void insert(User user);
 
-    PagedResponse<UserProfile> findAll(int page, int size);
-
     boolean existsByEmail(String email);
 
     Optional<User> findByEmail(String email);
+
+    PagedResponse<UserProfile> findByNameAndOrLastName(String name, String lastName, int page, int size);
 
     void deleteAll();
 

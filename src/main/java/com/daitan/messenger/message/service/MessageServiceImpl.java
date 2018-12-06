@@ -2,6 +2,7 @@ package com.daitan.messenger.message.service;
 
 import com.daitan.messenger.message.model.Message;
 import com.daitan.messenger.message.repository.MessageRepository;
+import com.daitan.messenger.users.model.PagedResponse;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -26,5 +27,10 @@ public class MessageServiceImpl implements MessageService {
     @Override
     public List<Message> findMessageByChatId(String chatId) {
         return messageRepository.findMessageByChatId(chatId);
+    }
+
+    @Override
+    public PagedResponse findAllMessages(String emitter, String receptor,int page, int size) {
+        return messageRepository.findAllMessages(emitter, receptor, page, size);
     }
 }
