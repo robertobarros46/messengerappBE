@@ -41,7 +41,7 @@ public class ChatBrokerControllerImplTest {
     private int port;
     private String URL;
 
-    private Message messageInfo;
+    private Message message;
 
     private CompletableFuture<Message> completableFuture;
 
@@ -49,7 +49,7 @@ public class ChatBrokerControllerImplTest {
     public void setUp() throws Exception {
         completableFuture = new CompletableFuture<>();
         URL = "ws://localhost:" + port + "/socket/";
-        messageInfo = new Message(UUID.randomUUID().toString(), "Hello, hello!!!", "5bf58540d7e90c4e80e8e4db", "roberto.netto@.gmail.com.br","f0bfadec-5e2a-49d4-86ba-e9f62e9c7908");
+        message = new Message(UUID.randomUUID().toString(),UUID.randomUUID().toString(),  "Hello, hello!!!", "5c07ee05d7e90c36d3a93a2a", "Roberto","e82df7f2-64ed-4127-ac49-57b3e3c65ef5");
     }
 
     @WithMockUser(authorities = "ROLE_ADMIN")
@@ -64,7 +64,7 @@ public class ChatBrokerControllerImplTest {
 
         System.out.println("URL " + URL);//+ "5bd9d69179fe6c209ae90bc1"
 
-        stompSession.subscribe(SUBSCRIBE_TO_RECEIVE_MESSAGE_URN + "5bf5818ad7e90c491535186b", new StompFrameHandler() {
+        stompSession.subscribe(SUBSCRIBE_TO_RECEIVE_MESSAGE_URN + "5c07ee38d7e90c36d3a93a2b", new StompFrameHandler() {
             @Override
             public Type getPayloadType(StompHeaders stompHeaders) {
                 System.out.println(stompHeaders.toString());
@@ -78,11 +78,11 @@ public class ChatBrokerControllerImplTest {
             }
         });
 
-        stompSession.send(SEND_MESSAGE, messageInfo);
+        stompSession.send(SEND_MESSAGE, message);
 
-        Message messageInfo1 = completableFuture.get(5, TimeUnit.SECONDS);
+        Message message = completableFuture.get(5, TimeUnit.SECONDS);
 
-        assertNotNull(messageInfo1);
+        assertNotNull(message);
     }
 
     private List<Transport> createTransportClient() {

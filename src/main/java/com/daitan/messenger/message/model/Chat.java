@@ -4,18 +4,19 @@ import com.daitan.messenger.constants.ConstantsUtils;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Objects;
 
 public class Chat {
 
     public static final byte[] tableNameAsBytes = Bytes.toBytes(ConstantsUtils.CHAT_TABLE);
-    public static final String columnFamillyChatInfo = "CF_CHAT_INFO";
-    public static final byte[] columnFamillyChatAsBytes = Bytes.toBytes(columnFamillyChatInfo);
+    public static final String columnFamillyChat = "CF_CHAT";
+    public static final byte[] columnFamillyChatAsBytes = Bytes.toBytes(columnFamillyChat);
     public static final byte[] chatIdAsBytes = Bytes.toBytes("chatId");
     public static final byte[] chatNameAsBytes = Bytes.toBytes("chatName");
     public static final byte[] userIdAsBytes = Bytes.toBytes("userId");
+
+    private String row;
 
     private String chatId;
 
@@ -27,19 +28,28 @@ public class Chat {
 
 
     @JsonCreator
-    @Autowired
-    public Chat(@JsonProperty(value = "chatId", required = false) String chatId,
+    public Chat(@JsonProperty(value = "row", required = false) String row,
+                @JsonProperty(value = "chatId", required = false) String chatId,
                 @JsonProperty(value = "chatName", required = false) String chatName,
                 @JsonProperty(value = "userId", required = false) String userId) {
+        this.row = row;
         this.chatId = chatId;
         this.chatName = chatName;
         this.userId = userId;
     }
 
-    public static final Chat bytesToChat(byte[] chatId, byte[] chatName, byte[] userId, long timestamp) {
-        Chat chatInfo = new Chat(Bytes.toString(chatId), Bytes.toString(chatName), Bytes.toString(userId));
-        chatInfo.setTimestamp(timestamp);
-        return chatInfo;
+    public static final Chat bytesToChat(byte[] row, byte[] chatId, byte[] chatName, byte[] userId, long timestamp) {
+        Chat chat = new Chat(Bytes.toString(row), Bytes.toString(chatId), Bytes.toString(chatName), Bytes.toString(userId));
+        chat.setTimestamp(timestamp);
+        return chat;
+    }
+
+    public String getRow() {
+        return row;
+    }
+
+    public void setRow(String row) {
+        this.row = row;
     }
 
     public String getChatId() {
@@ -78,22 +88,24 @@ public class Chat {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Chat chatInfo = (Chat) o;
-        return timestamp == chatInfo.timestamp &&
-                Objects.equals(chatId, chatInfo.chatId) &&
-                Objects.equals(chatName, chatInfo.chatName) &&
-                Objects.equals(userId, chatInfo.userId);
+        Chat chat = (Chat) o;
+        return timestamp == chat.timestamp &&
+                Objects.equals(row, chat.row) &&
+                Objects.equals(chatId, chat.chatId) &&
+                Objects.equals(chatName, chat.chatName) &&
+                Objects.equals(userId, chat.userId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(chatId, chatName, userId, timestamp);
+        return Objects.hash(row, chatId, chatName, userId, timestamp);
     }
 
     @Override
     public String toString() {
         return "Chat{" +
-                "chatId='" + chatId + '\'' +
+                "row='" + row + '\'' +
+                ", chatId='" + chatId + '\'' +
                 ", chatName='" + chatName + '\'' +
                 ", userId='" + userId + '\'' +
                 ", timestamp=" + timestamp +

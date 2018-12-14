@@ -9,7 +9,6 @@ import com.google.common.collect.Lists;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -17,16 +16,23 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.isNull;
 import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 public class UserServiceTest {
 
@@ -41,25 +47,27 @@ public class UserServiceTest {
 
     private MongoTemplate mongoTemplateMock;
 
+    private PasswordEncoder passwordEncodermock;
+
     private UserServiceImpl userServiceImpl;
 
     private Pageable pageable;
 
-    private User user;
+    private Optional<User> user;
 
     @Before
     public void setUp() {
-        user = new User(NAME, LAST_NAME, EMAIL, PASSWORD, ROLE);
+        user = Optional.of(new User(NAME, LAST_NAME, EMAIL, PASSWORD, ROLE));
         pageable = isNull(pageable) ?  new PageRequest(0, 2, Sort.Direction.ASC, "email") : pageable;
         userRepositoryMock = mock(UserRepository.class);
         mongoTemplateMock = isNull(mongoTemplateMock) ? mock(MongoTemplate.class) : mongoTemplateMock ;
-        userServiceImpl = new UserServiceImpl(userRepositoryMock, mongoTemplateMock);
+        passwordEncodermock = isNull(passwordEncodermock) ? mock(PasswordEncoder.class) : passwordEncodermock ;
+        userServiceImpl = new UserServiceImpl(userRepositoryMock, mongoTemplateMock, passwordEncodermock);
     }
-
 
     @Test
     public void saveNewUser() {
-        userServiceImpl.save(user);
+        userServiceImpl.save(user.get());
 
         ArgumentCaptor<User> toDoArgument = ArgumentCaptor.forClass(User.class);
         verify(userRepositoryMock, times(1)).save(toDoArgument.capture());
@@ -68,24 +76,24 @@ public class UserServiceTest {
         User userSaved = toDoArgument.getValue();
 
         assertNull(userSaved.getId());
-        assertThat(userSaved.getName(), is(user.getName()));
-        assertThat(userSaved.getLastName(), is(user.getLastName()));
-        assertThat(userSaved.getEmail(), is(user.getEmail()));
-        assertThat(userSaved.getPassword(), is(user.getPassword()));
+        assertThat(userSaved.getName(), is(user.get().getName()));
+        assertThat(userSaved.getLastName(), is(user.get().getLastName()));
+        assertThat(userSaved.getEmail(), is(user.get().getEmail()));
+        assertThat(userSaved.getPassword(), is(user.get().getPassword()));
     }
 
     @Test
     public void findIdByEmail() {
-        when(userRepositoryMock.findIdByEmail(EMAIL)).thenReturn(user);
+        when(userRepositoryMock.findIdByEmail(EMAIL)).thenReturn(user.get());
         User actual = userServiceImpl.findIdByEmail(EMAIL);
         verify(userRepositoryMock, times(1)).findIdByEmail(EMAIL);
         verifyNoMoreInteractions(userRepositoryMock);
-        assertThat(actual, is(user));
+        assertThat(actual, is(user.get()));
     }
 
     @Test
     public void findById() {
-        when(userRepositoryMock.findById(ID)).thenReturn(Optional.ofNullable(user));
+        when(userRepositoryMock.findById(ID)).thenReturn(Optional.ofNullable(user.get()));
         Optional<User> actual = userServiceImpl.findById(ID);
         verify(userRepositoryMock, times(1)).findById(ID);
         verifyNoMoreInteractions(userRepositoryMock);
@@ -103,7 +111,7 @@ public class UserServiceTest {
 
     @Test
     public void insert() {
-        userServiceImpl.insert(user);
+        userServiceImpl.insert(user.get());
 
         ArgumentCaptor<User> toDoArgument = ArgumentCaptor.forClass(User.class);
         verify(userRepositoryMock, times(1)).insert(toDoArgument.capture());
@@ -112,30 +120,36 @@ public class UserServiceTest {
         User userSaved = toDoArgument.getValue();
 
         assertNull(userSaved.getId());
-        assertThat(userSaved.getName(), is(user.getName()));
-        assertThat(userSaved.getLastName(), is(user.getLastName()));
-        assertThat(userSaved.getEmail(), is(user.getEmail()));
-        assertThat(userSaved.getPassword(), is(user.getPassword()));
+        assertThat(userSaved.getName(), is(user.get().getName()));
+        assertThat(userSaved.getLastName(), is(user.get().getLastName()));
+        assertThat(userSaved.getEmail(), is(user.get().getEmail()));
+        assertThat(userSaved.getPassword(), is(user.get().getPassword()));
     }
 
     @Test
-    public void findAll() {
+    public void findByNameAndOrLastName() {
         int page = 0;
-        int size = 2;
-        List<User> expectedUsers = Lists.newArrayList(user);
+        int size = 1;
+        List<User> expectedUsers = Lists.newArrayList(user.get());
         List<UserProfile> userProfiles = expectedUsers.stream()
                 .map(user -> new UserProfile(user.getId(), user.getEmail(), user.getName(), user.getRole()))
                 .collect(Collectors.toList());
 
-        when(userRepositoryMock.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(expectedUsers));
+        when(userRepositoryMock.findAll(any(Pageable.class))).thenReturn(new PageImpl<User>(expectedUsers));
+        when(userRepositoryMock.findByName(anyString(), any(Pageable.class))).thenReturn(new PageImpl<User>(expectedUsers));
+        when(userRepositoryMock.findByLastName(anyString(), any(Pageable.class))).thenReturn(new PageImpl<User>(expectedUsers));
+        when(userRepositoryMock.findByNameAndLastName(anyString(), anyString(), any(Pageable.class))).thenReturn(new PageImpl<User>(expectedUsers));
 
-        PagedResponse<UserProfile> actual = userServiceImpl.findByNameAndOrLastName(user.getName(), user.getLastName(), page, size);
-
-        verify(userRepositoryMock, times(1)).findAll(pageable);
-        verifyNoMoreInteractions(userRepositoryMock);
-
+        PagedResponse<UserProfile> actual = userServiceImpl.findByNameAndOrLastName("","", page, size);
         PagedResponse<UserProfile> expectedPagedResponse = new PagedResponse<>(userProfiles, 0, 0, 1, 1, true);
+        checkPagedResponses(actual, expectedPagedResponse);
 
+        actual = userServiceImpl.findByNameAndOrLastName("test","", page, size);
+        expectedPagedResponse = new PagedResponse<>(userProfiles, 0, 0, 1, 1, true);
+        checkPagedResponses(actual, expectedPagedResponse);
+
+        actual = userServiceImpl.findByNameAndOrLastName("","test", page, size);
+        expectedPagedResponse = new PagedResponse<>(userProfiles, 0, 0, 1, 1, true);
         checkPagedResponses(actual, expectedPagedResponse);
     }
 
@@ -160,7 +174,6 @@ public class UserServiceTest {
 
     @Test
     public void findByEmail() {
-        Optional<User> user = Optional.ofNullable(new User(NAME, LAST_NAME, EMAIL, PASSWORD, ROLE));
         when(userRepositoryMock.findByEmail(EMAIL)).thenReturn(user);
         Optional<User> actual = userServiceImpl.findByEmail(EMAIL);
         verify(userRepositoryMock, times(1)).findByEmail(EMAIL);

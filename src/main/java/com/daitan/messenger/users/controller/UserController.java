@@ -57,11 +57,10 @@ public class UserController {
     }
 
 
-    @PreAuthorize("hasRole('USER') OR hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') OR hasRole('ADMIN') OR hasRole('AUDITOR')")
     @RequestMapping(value = "/users/current", method = RequestMethod.GET)
     public UserSummary getCurrentUser(@CurrentUser UserPrincipal currentUser) {
-        UserSummary userSummary = new UserSummary(currentUser.getId(), currentUser.getEmail(), currentUser.getName(), currentUser.getAuthorities());
-        return userSummary;
+        return new UserSummary(currentUser.getId(), currentUser.getEmail(), currentUser.getName(), currentUser.getAuthorities());
     }
 
     @RequestMapping(value = "/users/emailavailability", method = RequestMethod.GET)
@@ -75,21 +74,19 @@ public class UserController {
         }
     }
 
-    @PreAuthorize("hasRole('USER') OR hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') OR hasRole('ADMIN') OR hasRole('AUDITOR')")
     @RequestMapping(value = "/users/{email:.+}", method = RequestMethod.GET)
     public UserProfile getUserProfile(@PathVariable(value = "email") String email) {
         try {
             Optional<User> userOptional = userService.findByEmail(email);
             User user = userOptional.orElseThrow(() -> new UserNotFoundException("404", "User not found please try again!!"));
-            UserProfile userProfile = new UserProfile(user.getId(), user.getEmail(), user.getName(), user.getRole());
-            return userProfile;
+            return new UserProfile(user.getId(), user.getEmail(), user.getName(), user.getRole());
         } catch (SQLException e) {
             logger.error("Couldn't perform database operation");
             throw new SQLException("500", "Couldn't perform database operation, please try again!!!");
         }
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @RequestMapping(value = "/users", method = RequestMethod.GET)
     public ResponseEntity<PagedResponse<UserProfile>> getUsers(
             @RequestParam(value = "name", defaultValue = ConstantsUtils.EMPTY_STRING) String name,
@@ -105,6 +102,7 @@ public class UserController {
         }
     }
 
+    @PreAuthorize("hasRole('USER') OR hasRole('ADMIN') OR hasRole('AUDITOR')")
     @RequestMapping(value = "/users", method = RequestMethod.POST, headers = "Accept=application/json")
     public ResponseEntity<User> createUser(@RequestBody User user) {
         if(Objects.isNull(user)|| Strings.isBlank(user.getEmail())  || Strings.isBlank(user.getPassword()) || Strings.isBlank(user.getName())) {
@@ -148,8 +146,8 @@ public class UserController {
     @RequestMapping(value = "/chats", method = RequestMethod.PUT)
     public HttpEntity<Chat> saveChat(@RequestBody Chat[] chats){
         try {
-            List chatList = Arrays.asList(chats);
-            chatService.createChatOneToOne(chatList);
+            List<Chat> chatList = Arrays.asList(chats);
+            this.chatService.createChatOneToOne(chatList);
             return new ResponseEntity(chats, HttpStatus.CREATED);
         }
         catch(Exception e) {
@@ -159,29 +157,78 @@ public class UserController {
     }
 
     @PreAuthorize("hasRole('ADMIN')")
+    @RequestMapping(value = "/chats", method = RequestMethod.GET)
+    public ResponseEntity<PagedResponse<Chat>> findAllChats(
+            @RequestParam(value = "emitter", defaultValue = ConstantsUtils.EMPTY_STRING) String emitter,
+            @RequestParam(value = "receptor", defaultValue = ConstantsUtils.EMPTY_STRING) String receptor,
+            @RequestParam(value = "content", defaultValue = ConstantsUtils.EMPTY_STRING) String content,
+            @RequestParam(value = "page", defaultValue = ConstantsUtils.DEFAULT_PAGE_NUMBER) int page,
+            @RequestParam(value = "size", defaultValue = ConstantsUtils.DEFAULT_PAGE_SIZE) int size){
+        try {
+            PagedResponse<Chat> chat = this.chatService.findAllChats(emitter, receptor, content, page, size);
+            return new ResponseEntity<>(chat, HttpStatus.PARTIAL_CONTENT);
+        }catch (SQLException e) {
+            logger.error("Couldn't perform database operation");
+            throw new SQLException("500", "Couldn't perform database operation, please try again!!!");
+        }
+    }
+
+    @PreAuthorize("hasRole('AUDITOR')")
     @RequestMapping(value = "/chats/messages", method = RequestMethod.GET)
     public ResponseEntity<PagedResponse<Message>> findAllMessages(
             @RequestParam(value = "emitter", defaultValue = ConstantsUtils.EMPTY_STRING) String emitter,
             @RequestParam(value = "receptor", defaultValue = ConstantsUtils.EMPTY_STRING) String receptor,
             @RequestParam(value = "page", defaultValue = ConstantsUtils.DEFAULT_PAGE_NUMBER) int page,
             @RequestParam(value = "size", defaultValue = ConstantsUtils.DEFAULT_PAGE_SIZE) int size){
-        PagedResponse message = messageService.findAllMessages(emitter, receptor, page, size);
-        message.getContent().sort(Comparator.comparing(Message::getTimestamp));
-        return new ResponseEntity<>(message, HttpStatus.PARTIAL_CONTENT);
+        try {
+            PagedResponse<Message> message = this.messageService.findAllMessages(emitter, receptor, page, size);
+            if(!Objects.isNull(message)){
+                message.getContent().sort(Comparator.comparing(Message::getTimestamp));
+            }
+            return new ResponseEntity<>(message, HttpStatus.PARTIAL_CONTENT);
+        }catch (SQLException e) {
+            logger.error("Couldn't perform database operation");
+            throw new SQLException("500", "Couldn't perform database operation, please try again!!!");
+        }
     }
 
     @RequestMapping(value = "/chats/{chatId}/messages", method = RequestMethod.GET)
-    public HttpEntity<Resources<Resource<Message>>> findMessagesByChatId(@PathVariable("chatId") String chatId){
-        List<Message> message = messageService.findMessageByChatId(chatId);
-        message.sort(Comparator.comparing(Message::getTimestamp));
-        return new ResponseEntity(new Resources(message), HttpStatus.ACCEPTED);
+    public HttpEntity<Resources<Resource<Message>>> findMessagesByChatId(@PathVariable("chatId") String chatId) {
+        try {
+            List<Message> message = this.messageService.findMessageByChatId(chatId);
+            if(!message.isEmpty()){
+                message.sort(Comparator.comparing(Message::getTimestamp));
+            }
+            message.sort(Comparator.comparing(Message::getTimestamp));
+            return new ResponseEntity(new Resources(message), HttpStatus.ACCEPTED);
+        } catch (SQLException e) {
+            logger.error("Couldn't perform database operation");
+            throw new SQLException("500", "Couldn't perform database operation, please try again!!!");
+        }
     }
 
 
     @RequestMapping(value = "/chats/{userId}", method = RequestMethod.GET)
-    public HttpEntity<Resources<Resource<Chat>>> findChats(@PathVariable("userId") String userId){
-        List<Chat> chats = chatService.findChatByUserId(userId);
-        return new ResponseEntity(chats,  HttpStatus.OK);
+    public HttpEntity<Resources<Resource<Chat>>> findChatsByUserId(@PathVariable("userId") String userId) {
+        try {
+            List<Chat> chats = chatService.findChatByUserId(userId);
+            return new ResponseEntity(chats, HttpStatus.OK);
+        } catch (SQLException e) {
+            logger.error("Couldn't perform database operation");
+            throw new SQLException("500", "Couldn't perform database operation, please try again!!!");
+        }
     }
 
+    @PreAuthorize("hasRole('USER') OR hasRole('ADMIN') OR hasRole('AUDITOR')")
+    @RequestMapping(value = "/chats/{chatId}", method = RequestMethod.DELETE)
+    public HttpEntity<Resources<Resource<Chat>>> deleteChats(@PathVariable("chatId") String chatId) {
+        try {
+            chatService.deleteChat(chatId);
+            messageService.deleteMessagesFromChat(chatId);
+            return new ResponseEntity(HttpStatus.NO_CONTENT);
+        } catch (SQLException e) {
+            logger.error("Couldn't perform database operation");
+            throw new SQLException("500", "Couldn't perform database operation, please try again!!!");
+        }
+    }
 }

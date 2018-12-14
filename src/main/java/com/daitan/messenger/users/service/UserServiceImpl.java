@@ -27,15 +27,14 @@ public class UserServiceImpl implements UserService {
 
     private UserRepository userRepository;
     private MongoTemplate mongoTemplate;
-
-    @Autowired
-    PasswordEncoder passwordEncoder;
+    private PasswordEncoder passwordEncoder;
 
 
     @Autowired
-    public UserServiceImpl(UserRepository userRepository, MongoTemplate mongoTemplate) {
+    public UserServiceImpl(UserRepository userRepository, MongoTemplate mongoTemplate, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.mongoTemplate = mongoTemplate;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -80,18 +79,28 @@ public class UserServiceImpl implements UserService {
         Pageable pageable = PageRequest.of(page, size, Sort.Direction.ASC, "email");
         PagedResponse pagedResponse;
         Page<User> usersPage;
-        if(Strings.isBlank(name) && Strings.isBlank(lastName)){
-            usersPage = userRepository.findAll(pageable);
-        }else{
-            Query query = new Query().with(pageable);
-            query.addCriteria(Criteria.where("name").is(name));
-            List<User> users = mongoTemplate.find(query, User.class);
-            usersPage = PageableExecutionUtils.getPage(
-                    users,
-                    pageable,
-                    () -> mongoTemplate.count(query, User.class));
-        }
+//        if(Strings.isBlank(name) && Strings.isBlank(lastName)){
+//            usersPage = userRepository.findAll(pageable);
+//        }else{
+//            Criteria criteria = new Criteria();
+//            criteria.orOperator(Criteria.where("name").is(name), Criteria.where("lastName").is(lastName));
+//            Query query = new Query(criteria).with(pageable);
+//            List<User> users = mongoTemplate.find(query, User.class);
+//            usersPage = PageableExecutionUtils.getPage(
+//                    users,
+//                    pageable,
+//                    () -> mongoTemplate.count(query, User.class));
+//        }
 
+        if (Strings.isNotBlank(name) && Strings.isNotBlank(lastName)) {
+            usersPage = userRepository.findByNameAndLastName(name, lastName, pageable);
+        } else if (Strings.isNotBlank(name)) {
+            usersPage = userRepository.findByName(name, pageable);
+        } else if (Strings.isNotBlank(lastName)) {
+            usersPage = userRepository.findByLastName(lastName, pageable);
+        } else {
+            usersPage = userRepository.findAll(pageable);
+        }
         pagedResponse = getPagedResponse(usersPage);
 
         return pagedResponse;

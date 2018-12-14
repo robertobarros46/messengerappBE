@@ -27,16 +27,13 @@ public class ChatBrokerServiceImpl implements ChatBrokerService {
 
     @Override
     public void sendMessage(Message message) {
-
         String chatId = message.getChatId();
         List<Chat> chats = chatService.findChat(chatId);
-
         List<Chat> toSendChat = chats.stream()
                 .filter(chat -> !chat.getUserId().equals(message.getFromUserId()))
                 .collect(Collectors.toList());
-
+        messageService.createMessage(message);
         for (Chat c : toSendChat) {
-            messageService.createMessage(message);
             simpMessagingTemplate.convertAndSend(SUBSCRIBE_TO_RECEIVE_MESSAGE_URN + c.getUserId(), message);
         }
 

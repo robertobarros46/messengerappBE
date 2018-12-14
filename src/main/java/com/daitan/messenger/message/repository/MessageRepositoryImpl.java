@@ -7,13 +7,20 @@ import com.daitan.messenger.users.model.PagedResponse;
 import com.daitan.messenger.users.model.User;
 import com.daitan.messenger.users.service.UserService;
 import com.google.common.collect.Lists;
+import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.filter.*;
+import org.apache.hadoop.hbase.filter.BinaryComparator;
+import org.apache.hadoop.hbase.filter.CompareFilter;
+import org.apache.hadoop.hbase.filter.Filter;
+import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.hadoop.hbase.HbaseTemplate;
 
 import java.util.Collections;
@@ -52,7 +59,7 @@ public class MessageRepositoryImpl implements MessageRepository {
     }
 
     @Override
-    public PagedResponse findAllMessages(String emitter, String receptor, int page, int size) {
+    public Page<Message> findAllMessages(String emitter, String receptor, int page, int size) {
         List<Message> messages = Lists.newArrayList();
         Pageable pageable = PageRequest.of(page, size);
         if(!Strings.isBlank(emitter) && Strings.isBlank(receptor)){
@@ -94,7 +101,8 @@ public class MessageRepositoryImpl implements MessageRepository {
         }
         List<Message> subList = messages.subList(page*size, size*( page + 1));
         Page<Message> messagePage = new PageImpl<>(subList, pageable, messages.size());
-        return getPagedResponse(messagePage);
+
+        return messagePage;
     }
 
     private SingleColumnValueFilter createSingleColumnFilter(String column, byte[] byteColumn ) {
@@ -102,19 +110,6 @@ public class MessageRepositoryImpl implements MessageRepository {
                 byteColumn,
                 CompareFilter.CompareOp.EQUAL,
                 new BinaryComparator(Bytes.toBytes(column)));
-    }
-
-    private PagedResponse getPagedResponse(Page<Message> messagePage) {
-        PagedResponse pagedResponse;
-        if (messagePage.getNumberOfElements() == 0) {
-            pagedResponse = new PagedResponse<>(Collections.emptyList(), messagePage.getNumber(),
-                    messagePage.getSize(), messagePage.getTotalElements(), messagePage.getTotalPages(), messagePage.isLast());
-
-        }else {
-            pagedResponse = new PagedResponse<>(messagePage.stream().collect(Collectors.toList()), messagePage.getNumber(),
-                    messagePage.getSize(), messagePage.getTotalElements(), messagePage.getTotalPages(), messagePage.isLast());
-        }
-        return pagedResponse;
     }
 
     private List<Message> getAllMessagesFromChats(String chatId) {
@@ -167,12 +162,26 @@ public class MessageRepositoryImpl implements MessageRepository {
 
     private List<Message> findMessageByScan(Scan scan) {
         return hbaseTemplate.find(ConstantsUtils.MESSAGE_TABLE, scan, (result, i) ->
-                Message.bytesToMessage(result.getValue(Message.columnFamillyMessageAsBytes, Message.messageIdAsBytes),
+                Message.bytesToMessage(result.getRow(),
+                        result.getValue(Message.columnFamillyMessageAsBytes, Message.messageIdAsBytes),
                         result.getValue(Message.columnFamillyMessageAsBytes, Message.contentAsBytes),
                         result.getValue(Message.columnFamillyMessageAsBytes, Message.fromUserIdAsBytes),
                         result.getValue(Message.columnFamillyMessageAsBytes, Message.fromNameAsBytes),
                         result.getValue(Message.columnFamillyMessageAsBytes, Message.chatIdAsBytes),
                         result.raw()[0].getTimestamp())
         );
+    }
+
+    @Override
+    public void deleteMessagesFromChat(String chatId) {
+        List<Message> messages = findMessageByChatId(chatId);
+
+        for(Message message: messages){
+            Delete delete = new Delete(Bytes.toBytes(message.getRow()));
+            hbaseTemplate.execute(ConstantsUtils.CHAT_TABLE, hTableInterface -> {
+                hTableInterface.delete(delete);
+                return null;
+            });
+        }
     }
 }

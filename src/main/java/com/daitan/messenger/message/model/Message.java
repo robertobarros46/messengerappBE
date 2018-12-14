@@ -4,38 +4,44 @@ import com.daitan.messenger.constants.ConstantsUtils;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.springframework.data.elasticsearch.annotations.Document;
 
 import java.util.Objects;
 
+@Document(indexName = "messages", type = "messages", shards = 1)
 public class Message implements Comparable<Message>{
 
     public static final byte[] tableNameAsBytes = Bytes.toBytes(ConstantsUtils.MESSAGE_TABLE);
-    public static final String columnFamillyMessageInfo = "CF_MESSAGE_INFO";
-    public static final byte[] columnFamillyMessageAsBytes = Bytes.toBytes(columnFamillyMessageInfo);
+    public static final String columnFamillyMessage = "CF_MESSAGE";
+    public static final byte[] columnFamillyMessageAsBytes = Bytes.toBytes(columnFamillyMessage);
     public static final byte[] messageIdAsBytes = Bytes.toBytes("messageId");
     public static final byte[] chatIdAsBytes = Bytes.toBytes("chatId");
     public static final byte[] contentAsBytes = Bytes.toBytes("content");
     public static final byte[] fromUserIdAsBytes = Bytes.toBytes("fromUserId");
     public static final byte[] fromNameAsBytes = Bytes.toBytes("fromName");
 
-    public static final Message bytesToMessage(byte[] messageId, byte[] content, byte[] fromUserId, byte[] fromName, byte[] chatId, long timestamp) {
-        Message messageInfo = new Message(Bytes.toString(messageId), Bytes.toString(content), Bytes.toString(fromUserId), Bytes.toString(fromName), Bytes.toString(chatId));
-        messageInfo.setTimestamp(timestamp);
-        return messageInfo;
+    public static final Message bytesToMessage(byte[] row, byte[] messageId, byte[] content, byte[] fromUserId, byte[] fromName, byte[] chatId, long timestamp) {
+        Message message = new Message(Bytes.toString(row), Bytes.toString(messageId), Bytes.toString(content), Bytes.toString(fromUserId), Bytes.toString(fromName), Bytes.toString(chatId));
+        message.setTimestamp(timestamp);
+        return message;
     }
 
     @JsonCreator
-    public Message(@JsonProperty(value = "messageId", required = false) String messageId,
-                       @JsonProperty(value = "content", required = false) String content,
-                       @JsonProperty(value = "fromUserId", required = false) String fromUserId,
-                       @JsonProperty(value = "fromName", required = false) String fromName,
-                       @JsonProperty(value = "chatId", required = false) String chatId) {
+    public Message(@JsonProperty(value = "row", required = false) String row,
+                    @JsonProperty(value = "messageId", required = false) String messageId,
+                    @JsonProperty(value = "content", required = false) String content,
+                    @JsonProperty(value = "fromUserId", required = false) String fromUserId,
+                    @JsonProperty(value = "fromName", required = false) String fromName,
+                    @JsonProperty(value = "chatId", required = false) String chatId) {
+        this.row = row;
         this.messageId = messageId;
         this.content = content;
         this.fromUserId = fromUserId;
         this.fromName = fromName;
         this.chatId = chatId;
     }
+
+    private String row;
 
     private String messageId;
 
@@ -48,6 +54,14 @@ public class Message implements Comparable<Message>{
     private String chatId;
 
     private long timestamp;
+
+    public String getRow() {
+        return row;
+    }
+
+    public void setRow(String row) {
+        this.row = row;
+    }
 
     public String getMessageId() {
         return messageId;
@@ -103,6 +117,7 @@ public class Message implements Comparable<Message>{
         if (o == null || getClass() != o.getClass()) return false;
         Message that = (Message) o;
         return timestamp == that.timestamp &&
+                Objects.equals(row, that.row) &&
                 Objects.equals(messageId, that.messageId) &&
                 Objects.equals(fromUserId, that.fromUserId) &&
                 Objects.equals(chatId, that.chatId);
@@ -115,8 +130,9 @@ public class Message implements Comparable<Message>{
 
     @Override
     public String toString() {
-        return "MessageInfo{" +
-                "messageId='" + messageId + '\'' +
+        return "Message{" +
+                "row='" + row + '\'' +
+                ", messageId='" + messageId + '\'' +
                 ", content='" + content + '\'' +
                 ", fromUserId='" + fromUserId + '\'' +
                 ", fromName='" + fromName + '\'' +
