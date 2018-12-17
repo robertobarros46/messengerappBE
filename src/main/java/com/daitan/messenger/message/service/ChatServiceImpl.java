@@ -2,10 +2,12 @@ package com.daitan.messenger.message.service;
 
 import com.daitan.messenger.exception.UserNotFoundException;
 import com.daitan.messenger.message.model.Chat;
+import com.daitan.messenger.message.model.ChatResponse;
 import com.daitan.messenger.message.model.Message;
 import com.daitan.messenger.message.repository.ChatRepository;
 import com.daitan.messenger.users.model.PagedResponse;
 import com.daitan.messenger.users.model.User;
+import com.daitan.messenger.users.model.UserProfile;
 import com.daitan.messenger.users.service.UserService;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.hbase.client.Put;
@@ -59,12 +61,12 @@ public class ChatServiceImpl implements ChatService {
     }
 
     @Override
-    public PagedResponse<Chat> findAllChats(String emitter, String receptor, String content, int page, int size) {
+    public PagedResponse<ChatResponse> findAllChats(String emitter, String receptor, String content, int page, int size) {
         return getPagedResponse(chatRepository.findAllChats(emitter, receptor, content, page, size));
     }
 
-    private PagedResponse<Chat> getPagedResponse(Page<Chat> chatPage) {
-        PagedResponse<Chat> pagedResponse;
+    private PagedResponse<ChatResponse> getPagedResponse(Page<ChatResponse> chatPage) {
+        PagedResponse<ChatResponse> pagedResponse;
         if (chatPage.getNumberOfElements() == 0) {
             pagedResponse = new PagedResponse<>(Collections.emptyList(), chatPage.getNumber(),
                     chatPage.getSize(), chatPage.getTotalElements(), chatPage.getTotalPages(), chatPage.isLast());
@@ -85,4 +87,10 @@ public class ChatServiceImpl implements ChatService {
     public void deleteChat(String chatId){
         chatRepository.deleteChat(chatId);
     }
+
+    @Override
+    public List<UserProfile> findUsersByChat(String chatId){
+        return chatRepository.findUsersByChatId(chatId);
+    }
+
 }

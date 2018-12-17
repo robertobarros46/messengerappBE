@@ -54,4 +54,10 @@ public class MessageServiceImpl implements MessageService {
     public void deleteMessagesFromChat(String chatId) {
         messageRepository.deleteMessagesFromChat(chatId);
     }
+
+    @Override
+    public List<Message> findMessageByContent(String content){
+        return messageRepository.findMessageByContent(content);
+    }
+
 }

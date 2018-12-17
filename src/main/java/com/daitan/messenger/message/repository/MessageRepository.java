@@ -14,6 +14,8 @@ public interface MessageRepository {
 
     List<Message> findMessageByChatId(String chatId);
 
+    List<Message> findMessageByContent(String content);
+
     Page<Message> findAllMessages(String emitter, String receptor, int page, int size);
 
     void deleteMessagesFromChat(String chatId);

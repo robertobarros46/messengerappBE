@@ -54,8 +54,8 @@ public class UserControllerTest {
     public void setup() {
         user = new User("Roberto", "Barros", "roberto.netto@gmail.com.br", "admin", "ADMIN");
         chats = Lists.newArrayList(
-                new Chat(UUID.randomUUID().toString(), "osad651fd65sfds3165fdsf-fdsf65165", "test", "kg91h5k1gh6jkg"),
-                new Chat(UUID.randomUUID().toString(), "osad651fd65sfds3165fdsf-fdsf65165", "test1", "1651gfdg216d5f1gfdg2v"));
+                new Chat(UUID.randomUUID().toString(), "osad651fd65sfds3165fdsf-fdsf65165", "test", "kg91h5k1gh6jkg", "CHAT"),
+                new Chat(UUID.randomUUID().toString(), "osad651fd65sfds3165fdsf-fdsf65165", "test1", "1651gfdg216d5f1gfdg2v", "CHAT"));
         userController = new UserController(userService, chatService, messageService);
         mockMvc = MockMvcBuilders.standaloneSetup(userController).build();
     }

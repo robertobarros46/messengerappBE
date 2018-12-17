@@ -8,6 +8,7 @@ import com.daitan.messenger.exception.UserNotFoundException;
 import com.daitan.messenger.login.CurrentUser;
 import com.daitan.messenger.login.model.UserPrincipal;
 import com.daitan.messenger.message.model.Chat;
+import com.daitan.messenger.message.model.ChatResponse;
 import com.daitan.messenger.message.model.Message;
 import com.daitan.messenger.message.service.ChatService;
 import com.daitan.messenger.message.service.MessageService;
@@ -35,6 +36,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 
 @RestController
@@ -143,6 +145,7 @@ public class UserController {
         }).orElseThrow(() -> new UserNotFoundException("404", "User not found please try again!!"));
     }
 
+    @PreAuthorize("hasRole('USER') OR hasRole('ADMIN') OR hasRole('AUDITOR')")
     @RequestMapping(value = "/chats", method = RequestMethod.PUT)
     public HttpEntity<Chat> saveChat(@RequestBody Chat[] chats){
         try {
@@ -156,17 +159,48 @@ public class UserController {
         }
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('USER') OR hasRole('ADMIN') OR hasRole('AUDITOR')")
+    @RequestMapping(value = "/chats/{chatId}", method = RequestMethod.PUT)
+    public HttpEntity<Chat> updateChat(@RequestBody Chat[] chats){
+        try {
+            List<Chat> chatList = Arrays.asList(chats);
+            this.chatService.createChatOneToOne(chatList);
+            return new ResponseEntity(chats, HttpStatus.CREATED);
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @PreAuthorize("hasRole('AUDITOR')")
     @RequestMapping(value = "/chats", method = RequestMethod.GET)
-    public ResponseEntity<PagedResponse<Chat>> findAllChats(
+    public ResponseEntity<PagedResponse<ChatResponse>> findAllChats(
             @RequestParam(value = "emitter", defaultValue = ConstantsUtils.EMPTY_STRING) String emitter,
             @RequestParam(value = "receptor", defaultValue = ConstantsUtils.EMPTY_STRING) String receptor,
             @RequestParam(value = "content", defaultValue = ConstantsUtils.EMPTY_STRING) String content,
             @RequestParam(value = "page", defaultValue = ConstantsUtils.DEFAULT_PAGE_NUMBER) int page,
             @RequestParam(value = "size", defaultValue = ConstantsUtils.DEFAULT_PAGE_SIZE) int size){
         try {
-            PagedResponse<Chat> chat = this.chatService.findAllChats(emitter, receptor, content, page, size);
+            PagedResponse<ChatResponse> chat = this.chatService.findAllChats(emitter, receptor, content, page, size);
             return new ResponseEntity<>(chat, HttpStatus.PARTIAL_CONTENT);
+        }catch (SQLException e) {
+            logger.error("Couldn't perform database operation");
+            throw new SQLException("500", "Couldn't perform database operation, please try again!!!");
+        }
+    }
+
+    @PreAuthorize("hasRole('USER') OR hasRole('ADMIN') OR hasRole('AUDITOR')")
+    @RequestMapping(value = "/chats/{chatId}/{email}/users", method = RequestMethod.GET)
+    public ResponseEntity<List<String>> findUsersByChat(
+            @PathVariable(value = "chatId", required = true) String chatId,
+            @PathVariable(value = "email", required = true) String email
+    ){
+        try {
+            List<UserProfile> userProfiles = this.chatService.findUsersByChat(chatId);
+            List<String> emails = userProfiles.stream().map(UserProfile::getEmail).collect(Collectors.toList());
+            emails.remove(email);
+            return new ResponseEntity<>(emails, HttpStatus.OK);
         }catch (SQLException e) {
             logger.error("Couldn't perform database operation");
             throw new SQLException("500", "Couldn't perform database operation, please try again!!!");

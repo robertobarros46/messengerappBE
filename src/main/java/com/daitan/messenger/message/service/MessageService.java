@@ -13,6 +13,8 @@ public interface MessageService {
 
     List<Message> findMessageByChatId(String chatId);
 
+    List<Message> findMessageByContent(String content);
+
     PagedResponse<Message> findAllMessages(String emitter, String receptor,int page, int size);
 
     void deleteMessagesFromChat(String chatId);

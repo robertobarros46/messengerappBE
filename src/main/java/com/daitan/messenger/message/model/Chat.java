@@ -15,6 +15,7 @@ public class Chat {
     public static final byte[] chatIdAsBytes = Bytes.toBytes("chatId");
     public static final byte[] chatNameAsBytes = Bytes.toBytes("chatName");
     public static final byte[] userIdAsBytes = Bytes.toBytes("userId");
+    public static final byte[] chatTypeAsBytes = Bytes.toBytes("chatType");
 
     private String row;
 
@@ -24,6 +25,8 @@ public class Chat {
 
     private String userId;
 
+    private String chatType;
+
     private long timestamp;
 
 
@@ -31,15 +34,17 @@ public class Chat {
     public Chat(@JsonProperty(value = "row", required = false) String row,
                 @JsonProperty(value = "chatId", required = false) String chatId,
                 @JsonProperty(value = "chatName", required = false) String chatName,
-                @JsonProperty(value = "userId", required = false) String userId) {
+                @JsonProperty(value = "userId", required = false) String userId,
+                @JsonProperty(value = "chatType", required = false) String chatType) {
         this.row = row;
         this.chatId = chatId;
         this.chatName = chatName;
         this.userId = userId;
+        this.chatType = chatType;
     }
 
-    public static final Chat bytesToChat(byte[] row, byte[] chatId, byte[] chatName, byte[] userId, long timestamp) {
-        Chat chat = new Chat(Bytes.toString(row), Bytes.toString(chatId), Bytes.toString(chatName), Bytes.toString(userId));
+    public static final Chat bytesToChat(byte[] row, byte[] chatId, byte[] chatName, byte[] userId, byte[] chatType, long timestamp) {
+        Chat chat = new Chat(Bytes.toString(row), Bytes.toString(chatId), Bytes.toString(chatName), Bytes.toString(userId), Bytes.toString(chatType));
         chat.setTimestamp(timestamp);
         return chat;
     }
@@ -76,6 +81,14 @@ public class Chat {
         this.userId = userId;
     }
 
+    public String getChatType() {
+        return chatType;
+    }
+
+    public void setChatType(String chatType) {
+        this.chatType = chatType;
+    }
+
     public long getTimestamp() {
         return timestamp;
     }
@@ -93,12 +106,13 @@ public class Chat {
                 Objects.equals(row, chat.row) &&
                 Objects.equals(chatId, chat.chatId) &&
                 Objects.equals(chatName, chat.chatName) &&
-                Objects.equals(userId, chat.userId);
+                Objects.equals(userId, chat.userId) &&
+                Objects.equals(chatType, chat.chatType);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(row, chatId, chatName, userId, timestamp);
+        return Objects.hash(row, chatId, chatName, userId, chatType, timestamp);
     }
 
     @Override
@@ -108,6 +122,7 @@ public class Chat {
                 ", chatId='" + chatId + '\'' +
                 ", chatName='" + chatName + '\'' +
                 ", userId='" + userId + '\'' +
+                ", chatType='" + chatType + '\'' +
                 ", timestamp=" + timestamp +
                 '}';
     }

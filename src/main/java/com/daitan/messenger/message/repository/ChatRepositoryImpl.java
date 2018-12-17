@@ -1,10 +1,17 @@
 package com.daitan.messenger.message.repository;
 
 import com.daitan.messenger.constants.ConstantsUtils;
+import com.daitan.messenger.exception.UserNotFoundException;
 import com.daitan.messenger.message.model.Chat;
+import com.daitan.messenger.message.model.ChatResponse;
 import com.daitan.messenger.message.model.Message;
+import com.daitan.messenger.message.service.MessageService;
+import com.daitan.messenger.users.model.User;
+import com.daitan.messenger.users.model.UserProfile;
+import com.daitan.messenger.users.service.UserService;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Scan;
@@ -24,6 +31,7 @@ import org.springframework.data.hadoop.hbase.HbaseTemplate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -33,12 +41,17 @@ public class ChatRepositoryImpl implements ChatRepository {
     @Autowired
     private HbaseTemplate hbaseTemplate;
 
+    @Autowired
+    private UserService userService;
+
+    private MessageRepository messageRepository;
+
     @Override
-    public void createChat(String chatName, String... userId) {
+    public void createChat(String chatName, String chatType, String... userId) {
         List<Put> putList = new ArrayList<>();
         String chatId = UUID.randomUUID().toString();
         for (String u: userId) {
-            Chat chat = new Chat(UUID.randomUUID().toString(), chatId, chatName, u);
+            Chat chat = new Chat(UUID.randomUUID().toString(), chatId, chatName, u, chatType);
             Put put = new Put(Bytes.toBytes(UUID.randomUUID().toString()));
             mapperChat(chat, put);
             putList.add(put);
@@ -76,22 +89,49 @@ public class ChatRepositoryImpl implements ChatRepository {
     }
 
     @Override
-    public Page<Chat> findAllChats(String emitter, String receptor, String content, int page, int size) {
-        Map<String, Chat> chatMap = Maps.newHashMap();
-        List<Chat> chats = Lists.newArrayList();
+    public Page<ChatResponse> findAllChats(String emitter, String receptor, String content, int page, int size) {
+        Map<String, ChatResponse> chatMap = Maps.newHashMap();
+        List<Chat> chats;
         Pageable pageable = PageRequest.of(page, size);
         if(!Strings.isBlank(emitter) && !Strings.isBlank(receptor) && !Strings.isBlank(content)){
-
-
+            String emitterId = userService.findByEmail(emitter).map(User::getId).orElseThrow(UserNotFoundException::new);
+            String receptorId = userService.findByEmail(receptor).map(User::getId).orElseThrow(UserNotFoundException::new);
+            List<Chat> chatsFromEmitter = findChatByUserId(emitterId);
+            List<Chat> chatsFromReceptor = findChatByUserId(receptorId);
+            List<Chat> chatsFromContent = messageRepository.findMessageByContent(content).stream()
+                    .map(message -> findChat(message.getChatId()))
+                    .flatMap(List::stream)
+                    .collect(Collectors.toList());
+            chatsFromEmitter.retainAll(chatsFromReceptor);
+            chatsFromEmitter.retainAll(chatsFromContent);
+            chats = chatsFromEmitter;
         }else{
             Scan scan = new Scan();
             scan.addFamily(Chat.columnFamillyChatAsBytes);
             List<Chat> foundChats = findChatByScan(scan);
-            chatMap = foundChats.stream().collect(Collectors.toMap(Chat::getChatName, Function.identity()));
-
+            chats = foundChats;
         }
 
-        Page<Chat> messagePage = new PageImpl<>(chats, pageable, chats.size());
+        for (Chat chat: chats) {
+            if (chatMap.containsKey(chat.getChatId())) {
+                chatMap.get(chat.getChatId()).setChatsName(chat.getChatName());
+                chatMap.get(chat.getChatId()).setUserIds(chat.getUserId());
+            }else{
+                ChatResponse chatResponse = new ChatResponse();
+                chatResponse.setChatId(chat.getChatId());
+                chatResponse.setRowId(chat.getRow());
+                chatResponse.setChatsName(Sets.newHashSet(chat.getChatName()));
+                chatResponse.setUserIds(Lists.newArrayList(chat.getUserId()));
+                chatMap.put(chat.getChatId(), chatResponse);
+            }
+        }
+
+        List<ChatResponse> chatsResponse = new ArrayList<>(chatMap.values());
+        if(chatsResponse.size() < size){
+            size = chatsResponse.size();
+        }
+        List<ChatResponse> subList = chatsResponse.subList(page*size, size*( page + 1));
+        Page<ChatResponse> messagePage = new PageImpl<>(subList, pageable, chatsResponse.size());
         return messagePage;
     }
 
@@ -127,6 +167,9 @@ public class ChatRepositoryImpl implements ChatRepository {
         put.add(Chat.columnFamillyChatAsBytes,
                 Chat.userIdAsBytes,
                 Bytes.toBytes(chat.getUserId()));
+        put.add(Chat.columnFamillyChatAsBytes,
+                Chat.chatTypeAsBytes,
+                Bytes.toBytes(chat.getChatType()));
     }
 
     @Override
@@ -162,7 +205,18 @@ public class ChatRepositoryImpl implements ChatRepository {
                         result.getValue(Chat.columnFamillyChatAsBytes, Chat.chatIdAsBytes),
                         result.getValue(Chat.columnFamillyChatAsBytes, Chat.chatNameAsBytes),
                         result.getValue(Chat.columnFamillyChatAsBytes, Chat.userIdAsBytes),
+                        result.getValue(Chat.columnFamillyChatAsBytes, Chat.chatTypeAsBytes),
                         result.raw()[0].getTimestamp())
         );
+    }
+
+    @Override
+    public List<UserProfile> findUsersByChatId(String chatId){
+        List<Chat> chats = findChat(chatId);
+        return chats.stream()
+                .map(chat -> userService.findById(chat.getUserId()))
+                .map(Optional::get)
+                .map(user -> new UserProfile(user.getId(), user.getEmail(), user.getName(), user.getRole()))
+                .collect(Collectors.toList());
     }
 }

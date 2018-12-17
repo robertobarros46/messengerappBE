@@ -1,8 +1,10 @@
 package com.daitan.messenger.message.service;
 
 import com.daitan.messenger.message.model.Chat;
+import com.daitan.messenger.message.model.ChatResponse;
 import com.daitan.messenger.message.model.Message;
 import com.daitan.messenger.users.model.PagedResponse;
+import com.daitan.messenger.users.model.UserProfile;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,9 +18,10 @@ public interface ChatService {
 
     List<Chat> findChatByUserId(String userId);
 
-    PagedResponse<Chat> findAllChats(String emitter, String receptor, String content, int page, int size);
+    PagedResponse<ChatResponse> findAllChats(String emitter, String receptor, String content, int page, int size);
 
     void deleteChat(String chatId);
 
+    List<UserProfile> findUsersByChat(String chatId);
 }
 

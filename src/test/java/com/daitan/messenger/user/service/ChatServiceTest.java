@@ -38,8 +38,8 @@ public class ChatServiceTest {
     public void setUp() {
         user = new User("test", "test", "test@test.com.br", "123456", "ROLE_ADMIN");
         chats = Lists.newArrayList(
-                new Chat(UUID.randomUUID().toString(), "osad651fd65sfds3165fdsf-fdsf65165", "test", "5c07ee05d7e90c36d3a93a2a"),
-                new Chat(UUID.randomUUID().toString(),"osad651fd65sfds3165fdsf-fdsf65165", "test1", "5c07ee38d7e90c36d3a93a2b"));
+                new Chat(UUID.randomUUID().toString(), "osad651fd65sfds3165fdsf-fdsf65165", "test", "5c07ee05d7e90c36d3a93a2a", "CHAT"),
+                new Chat(UUID.randomUUID().toString(),"osad651fd65sfds3165fdsf-fdsf65165", "test1", "5c07ee38d7e90c36d3a93a2b", "CHAT"));
         chatRepositoryMock = mock(ChatRepository.class);
         userServiceMock = isNull(userServiceMock) ? mock(UserService.class) : userServiceMock ;
         chatServiceImpl = new ChatServiceImpl(chatRepositoryMock, userServiceMock);

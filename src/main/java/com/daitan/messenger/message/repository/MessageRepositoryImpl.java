@@ -82,9 +82,11 @@ public class MessageRepositoryImpl implements MessageRepository {
             Optional<User> receptorUser = userService.findByEmail(receptor);
             if(emitterUser.isPresent() && receptorUser.isPresent()){
                 List<String> chatsFromEmitter = chatRepository.findChatByUserId(emitterUser.get().getId()).stream()
-                        .map(Chat::getChatId).collect(Collectors.toList());
+                        .map(Chat::getChatId)
+                        .collect(Collectors.toList());
                 List<String> chatsFromReceptor = chatRepository.findChatByUserId(receptorUser.get().getId()).stream()
-                        .map(Chat::getChatId).collect(Collectors.toList());;
+                        .map(Chat::getChatId)
+                        .collect(Collectors.toList());;
                 chatsFromEmitter.retainAll(chatsFromReceptor);
                 messages = chatsFromEmitter.stream()
                         .map(this::getAllMessagesFromChats)
@@ -101,7 +103,6 @@ public class MessageRepositoryImpl implements MessageRepository {
         }
         List<Message> subList = messages.subList(page*size, size*( page + 1));
         Page<Message> messagePage = new PageImpl<>(subList, pageable, messages.size());
-
         return messagePage;
     }
 
@@ -178,10 +179,18 @@ public class MessageRepositoryImpl implements MessageRepository {
 
         for(Message message: messages){
             Delete delete = new Delete(Bytes.toBytes(message.getRow()));
-            hbaseTemplate.execute(ConstantsUtils.CHAT_TABLE, hTableInterface -> {
+            hbaseTemplate.execute(ConstantsUtils.MESSAGE_TABLE, hTableInterface -> {
                 hTableInterface.delete(delete);
                 return null;
             });
         }
+    }
+
+    @Override
+    public List<Message> findMessageByContent(String content){
+        SingleColumnValueFilter singleColumnValueFilter = createSingleColumnFilter(content, Message.contentAsBytes);
+        singleColumnValueFilter.setReversed(true);
+        Scan scan = createScan(singleColumnValueFilter);
+        return findMessageByScan(scan);
     }
 }
