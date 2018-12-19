@@ -4,11 +4,10 @@ import com.daitan.messenger.constants.ConstantsUtils;
 import com.daitan.messenger.exception.UserNotFoundException;
 import com.daitan.messenger.message.model.Chat;
 import com.daitan.messenger.message.model.ChatResponse;
-import com.daitan.messenger.message.model.Message;
-import com.daitan.messenger.message.service.MessageService;
 import com.daitan.messenger.users.model.User;
 import com.daitan.messenger.users.model.UserProfile;
 import com.daitan.messenger.users.service.UserService;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -32,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -50,7 +50,7 @@ public class ChatRepositoryImpl implements ChatRepository {
     public void createChat(String chatName, String chatType, String... userId) {
         List<Put> putList = new ArrayList<>();
         String chatId = UUID.randomUUID().toString();
-        for (String u: userId) {
+        for (String u : userId) {
             Chat chat = new Chat(UUID.randomUUID().toString(), chatId, chatName, u, chatType);
             Put put = new Put(Bytes.toBytes(UUID.randomUUID().toString()));
             mapperChat(chat, put);
@@ -66,6 +66,99 @@ public class ChatRepositoryImpl implements ChatRepository {
     @Override
     public void createChat(Chat chat) {
         saveChat(chat);
+    }
+
+
+    private void saveChat(Chat chat) {
+        Put put = new Put(Bytes.toBytes(UUID.randomUUID().toString()));
+        mapperChat(chat, put);
+
+        hbaseTemplate.execute(ConstantsUtils.CHAT_TABLE, hTableInterface -> {
+            hTableInterface.put(put);
+            return null;
+        });
+    }
+
+    private void mapperChat(Chat chat, Put put) {
+        put.add(Chat.columnFamillyChatAsBytes,
+                Chat.chatIdAsBytes,
+                Bytes.toBytes(chat.getChatId()));
+        put.add(Chat.columnFamillyChatAsBytes,
+                Chat.chatNameAsBytes,
+                Bytes.toBytes(chat.getChatName()));
+        put.add(Chat.columnFamillyChatAsBytes,
+                Chat.userIdAsBytes,
+                Bytes.toBytes(chat.getUserId()));
+        put.add(Chat.columnFamillyChatAsBytes,
+                Chat.chatTypeAsBytes,
+                Bytes.toBytes(chat.getChatType()));
+    }
+
+    @Override
+    public void updateChat(List<Chat> newChats, String chatId) {
+        String newChatName = Iterables.getLast(newChats).getChatName();
+
+        List<Chat> oldChats = findChat(chatId);
+
+        Map<String, Chat> chatMap = oldChats.stream()
+                .collect(Collectors.toMap(Chat::getUserId, Function.identity()));
+
+        List<String> linkedIds = newChats.stream()
+                .map(this::getCorrectUserIds)
+                .map(Chat::getUserId)
+                .collect(Collectors.toList());
+
+        Set<String> setIds = Sets.newHashSet(linkedIds);
+
+        List<Chat> chatsToDelete = Lists.newLinkedList(oldChats.stream()
+                .filter(chat -> !setIds.contains(chat.getUserId()))
+                .collect(Collectors.toList()));
+
+        chatsToDelete.forEach(chat -> deleteChat(chat.getChatId()));
+
+        oldChats.removeIf(chat -> !setIds.contains(chat.getUserId()));
+        for (Chat chat : newChats) {
+            if (chatMap.containsKey(chat.getUserId())) {
+                chat.setRow(chatMap.getOrDefault(chat.getUserId(), new Chat()).getRow());
+            }
+            chat.setChatId(chatId);
+        }
+
+        for (Chat newChat : newChats) {
+            Put put;
+            if (newChat.getRow() != null) {
+                put = new Put(Bytes.toBytes(newChat.getRow()));
+                createEditPut(chatId, newChatName, newChat, put);
+            }else{
+                put = new Put(Bytes.toBytes(UUID.randomUUID().toString()));
+                createEditPut(chatId, newChatName, newChat, put);
+            }
+            hbaseTemplate.execute(ConstantsUtils.CHAT_TABLE, hTableInterface -> {
+                hTableInterface.put(put);
+                return null;
+            });
+        }
+    }
+
+    private Chat getCorrectUserIds(Chat chat) {
+        Optional<User> user = userService.findIdByEmail(chat.getUserId());
+        user.ifPresent(user1 -> chat.setUserId(user1.getId()));
+        return chat;
+    }
+
+    private void createEditPut(String chatId, String newChatName, Chat newChat, Put put) {
+        put.add(Chat.columnFamillyChatAsBytes,
+                Chat.chatIdAsBytes,
+                Bytes.toBytes(chatId));
+        put.add(Chat.columnFamillyChatAsBytes,
+                Chat.chatNameAsBytes,
+                Bytes.toBytes(newChatName));
+        put.add(Chat.columnFamillyChatAsBytes,
+                Chat.userIdAsBytes,
+                Bytes.toBytes(newChat.getUserId()));
+        put.add(Chat.columnFamillyChatAsBytes,
+                Chat.chatTypeAsBytes,
+                Bytes.toBytes(newChat.getChatType()));
     }
 
     @Override
@@ -93,7 +186,7 @@ public class ChatRepositoryImpl implements ChatRepository {
         Map<String, ChatResponse> chatMap = Maps.newHashMap();
         List<Chat> chats;
         Pageable pageable = PageRequest.of(page, size);
-        if(!Strings.isBlank(emitter) && !Strings.isBlank(receptor) && !Strings.isBlank(content)){
+        if (!Strings.isBlank(emitter) && !Strings.isBlank(receptor) && !Strings.isBlank(content)) {
             String emitterId = userService.findByEmail(emitter).map(User::getId).orElseThrow(UserNotFoundException::new);
             String receptorId = userService.findByEmail(receptor).map(User::getId).orElseThrow(UserNotFoundException::new);
             List<Chat> chatsFromEmitter = findChatByUserId(emitterId);
@@ -105,18 +198,18 @@ public class ChatRepositoryImpl implements ChatRepository {
             chatsFromEmitter.retainAll(chatsFromReceptor);
             chatsFromEmitter.retainAll(chatsFromContent);
             chats = chatsFromEmitter;
-        }else{
+        } else {
             Scan scan = new Scan();
             scan.addFamily(Chat.columnFamillyChatAsBytes);
             List<Chat> foundChats = findChatByScan(scan);
             chats = foundChats;
         }
 
-        for (Chat chat: chats) {
+        for (Chat chat : chats) {
             if (chatMap.containsKey(chat.getChatId())) {
                 chatMap.get(chat.getChatId()).setChatsName(chat.getChatName());
                 chatMap.get(chat.getChatId()).setUserIds(chat.getUserId());
-            }else{
+            } else {
                 ChatResponse chatResponse = new ChatResponse();
                 chatResponse.setChatId(chat.getChatId());
                 chatResponse.setRowId(chat.getRow());
@@ -127,10 +220,10 @@ public class ChatRepositoryImpl implements ChatRepository {
         }
 
         List<ChatResponse> chatsResponse = new ArrayList<>(chatMap.values());
-        if(chatsResponse.size() < size){
+        if (chatsResponse.size() < size) {
             size = chatsResponse.size();
         }
-        List<ChatResponse> subList = chatsResponse.subList(page*size, size*( page + 1));
+        List<ChatResponse> subList = chatsResponse.subList(page * size, size * (page + 1));
         Page<ChatResponse> messagePage = new PageImpl<>(subList, pageable, chatsResponse.size());
         return messagePage;
     }
@@ -138,38 +231,13 @@ public class ChatRepositoryImpl implements ChatRepository {
     @Override
     public void deleteChat(String chatId) {
         List<Chat> chats = findChat(chatId);
-        for(Chat chat: chats){
+        for (Chat chat : chats) {
             Delete delete = new Delete(Bytes.toBytes(chat.getRow()));
             hbaseTemplate.execute(ConstantsUtils.CHAT_TABLE, hTableInterface -> {
                 hTableInterface.delete(delete);
                 return null;
             });
         }
-    }
-
-    private void saveChat(Chat chat) {
-        Put put = new Put(Bytes.toBytes(UUID.randomUUID().toString()));
-        mapperChat(chat, put);
-
-        hbaseTemplate.execute(ConstantsUtils.CHAT_TABLE, hTableInterface -> {
-            hTableInterface.put(put);
-            return null;
-        });
-    }
-
-    private void mapperChat(Chat chat, Put put) {
-        put.add(Chat.columnFamillyChatAsBytes,
-                Chat.chatIdAsBytes,
-                Bytes.toBytes(chat.getChatId()));
-        put.add(Chat.columnFamillyChatAsBytes,
-                Chat.chatNameAsBytes,
-                Bytes.toBytes(chat.getChatName()));
-        put.add(Chat.columnFamillyChatAsBytes,
-                Chat.userIdAsBytes,
-                Bytes.toBytes(chat.getUserId()));
-        put.add(Chat.columnFamillyChatAsBytes,
-                Chat.chatTypeAsBytes,
-                Bytes.toBytes(chat.getChatType()));
     }
 
     @Override
@@ -211,7 +279,7 @@ public class ChatRepositoryImpl implements ChatRepository {
     }
 
     @Override
-    public List<UserProfile> findUsersByChatId(String chatId){
+    public List<UserProfile> findUsersByChatId(String chatId) {
         List<Chat> chats = findChat(chatId);
         return chats.stream()
                 .map(chat -> userService.findById(chat.getUserId()))

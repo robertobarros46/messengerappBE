@@ -84,8 +84,8 @@ public class UserServiceTest {
 
     @Test
     public void findIdByEmail() {
-        when(userRepositoryMock.findIdByEmail(EMAIL)).thenReturn(user.get());
-        User actual = userServiceImpl.findIdByEmail(EMAIL);
+        when(userRepositoryMock.findIdByEmail(EMAIL)).thenReturn(user);
+        Optional<User> actual = userServiceImpl.findIdByEmail(EMAIL);
         verify(userRepositoryMock, times(1)).findIdByEmail(EMAIL);
         verifyNoMoreInteractions(userRepositoryMock);
         assertThat(actual, is(user.get()));

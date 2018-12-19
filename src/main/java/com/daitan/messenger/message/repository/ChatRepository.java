@@ -16,6 +16,8 @@ public interface ChatRepository {
 
     void createChat(Chat chatInfo);
 
+    void updateChat(List<Chat> chats, String chatId);
+
     void insertUserToChat(String chatId, String... userId);
 
     void updateChat(String chatId, String chatName);

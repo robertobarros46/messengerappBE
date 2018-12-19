@@ -139,7 +139,7 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     @RequestMapping(value = "/users", method = RequestMethod.DELETE)
     public ResponseEntity<User> deleteUser(@RequestParam(value = "email") String email) {
-        return Optional.of(this.userService.findIdByEmail(email)).map(user -> {
+        return this.userService.findIdByEmail(email).map(user -> {
             this.userService.deleteById(user.getId());
             return ResponseEntity.ok(user);
         }).orElseThrow(() -> new UserNotFoundException("404", "User not found please try again!!"));
@@ -161,10 +161,11 @@ public class UserController {
 
     @PreAuthorize("hasRole('USER') OR hasRole('ADMIN') OR hasRole('AUDITOR')")
     @RequestMapping(value = "/chats/{chatId}", method = RequestMethod.PUT)
-    public HttpEntity<Chat> updateChat(@RequestBody Chat[] chats){
+    public HttpEntity<Chat> updateChat(@RequestBody Chat[] chats,
+                                       @PathVariable(value = "chatId", required = true) String chatId){
         try {
             List<Chat> chatList = Arrays.asList(chats);
-            this.chatService.createChatOneToOne(chatList);
+            this.chatService.updateChat(chatList, chatId);
             return new ResponseEntity(chats, HttpStatus.CREATED);
         }
         catch(Exception e) {
@@ -192,15 +193,15 @@ public class UserController {
 
     @PreAuthorize("hasRole('USER') OR hasRole('ADMIN') OR hasRole('AUDITOR')")
     @RequestMapping(value = "/chats/{chatId}/{email}/users", method = RequestMethod.GET)
-    public ResponseEntity<List<String>> findUsersByChat(
+    public ResponseEntity<List<UserProfile>> findUsersByChat(
             @PathVariable(value = "chatId", required = true) String chatId,
             @PathVariable(value = "email", required = true) String email
     ){
         try {
-            List<UserProfile> userProfiles = this.chatService.findUsersByChat(chatId);
-            List<String> emails = userProfiles.stream().map(UserProfile::getEmail).collect(Collectors.toList());
-            emails.remove(email);
-            return new ResponseEntity<>(emails, HttpStatus.OK);
+            List<UserProfile> userProfiles = this.chatService.findUsersByChat(chatId).stream()
+                    .filter(userProfile -> !userProfile.getEmail().equals(email))
+                    .collect(Collectors.toList());
+            return new ResponseEntity<>(userProfiles, HttpStatus.OK);
         }catch (SQLException e) {
             logger.error("Couldn't perform database operation");
             throw new SQLException("500", "Couldn't perform database operation, please try again!!!");
@@ -259,7 +260,7 @@ public class UserController {
         try {
             chatService.deleteChat(chatId);
             messageService.deleteMessagesFromChat(chatId);
-            return new ResponseEntity(HttpStatus.NO_CONTENT);
+            return new ResponseEntity(HttpStatus.OK);
         } catch (SQLException e) {
             logger.error("Couldn't perform database operation");
             throw new SQLException("500", "Couldn't perform database operation, please try again!!!");

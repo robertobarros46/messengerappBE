@@ -109,7 +109,7 @@ public class UserControllerTest {
     public void testDeleteUsers() throws Exception {
         String uri = USER_URI_BASE + "?email=roberto.netto@gmail.com.br";
 
-        when(userService.findIdByEmail(user.getEmail())).thenReturn(user);
+        when(userService.findIdByEmail(user.getEmail())).thenReturn(Optional.of(user));
 
         doNothing().when(userService).deleteById(user.getId());
 

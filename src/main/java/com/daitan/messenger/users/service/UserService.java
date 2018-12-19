@@ -10,7 +10,7 @@ import java.util.Optional;
 @Service
 public interface UserService {
 
-    User findIdByEmail(String email);
+    Optional<User> findIdByEmail(String email);
 
     Optional<User> findById(String id);
 

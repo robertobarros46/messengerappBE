@@ -43,6 +43,10 @@ public class Chat {
         this.chatType = chatType;
     }
 
+    public Chat() {
+
+    }
+
     public static final Chat bytesToChat(byte[] row, byte[] chatId, byte[] chatName, byte[] userId, byte[] chatType, long timestamp) {
         Chat chat = new Chat(Bytes.toString(row), Bytes.toString(chatId), Bytes.toString(chatName), Bytes.toString(userId), Bytes.toString(chatType));
         chat.setTimestamp(timestamp);

@@ -14,6 +14,8 @@ public interface ChatService {
 
     void createChatOneToOne(List<Chat> chats);
 
+    void updateChat(List<Chat> chats, String chatId);
+
     List<Chat> findChat(String chatId);
 
     List<Chat> findChatByUserId(String userId);

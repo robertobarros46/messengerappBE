@@ -3,23 +3,12 @@ package com.daitan.messenger.message.service;
 import com.daitan.messenger.exception.UserNotFoundException;
 import com.daitan.messenger.message.model.Chat;
 import com.daitan.messenger.message.model.ChatResponse;
-import com.daitan.messenger.message.model.Message;
 import com.daitan.messenger.message.repository.ChatRepository;
 import com.daitan.messenger.users.model.PagedResponse;
 import com.daitan.messenger.users.model.User;
 import com.daitan.messenger.users.model.UserProfile;
 import com.daitan.messenger.users.service.UserService;
-import com.google.common.collect.Lists;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.filter.BinaryComparator;
-import org.apache.hadoop.hbase.filter.CompareFilter;
-import org.apache.hadoop.hbase.filter.Filter;
-import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
-import org.apache.hadoop.hbase.util.Bytes;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
-import org.springframework.data.hadoop.hbase.HbaseTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
@@ -42,18 +31,24 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public void createChatOneToOne(List<Chat> chats) {
-        for(Chat chat: chats) {
+        for (Chat chat : chats) {
             Optional<User> optionalUser = userService.findById(chat.getUserId());
             if (!optionalUser.isPresent()) {
-                throw new UserNotFoundException("404","User: "+ chat.getUserId() +" not found please try again!! ");
+                throw new UserNotFoundException("404", "User: " + chat.getUserId() + " not found please try again!! ");
             }
         }
         String chatId = UUID.randomUUID().toString();
-        for(Chat chat: chats) {
+        for (Chat chat : chats) {
             chat.setChatId(chatId);
             chatRepository.createChat(chat);
         }
     }
+
+    @Override
+    public void updateChat(List<Chat> chats, String chatId) {
+        chatRepository.updateChat(chats, chatId);
+    }
+
 
     @Override
     public List<Chat> findChat(String chatId) {
@@ -71,7 +66,7 @@ public class ChatServiceImpl implements ChatService {
             pagedResponse = new PagedResponse<>(Collections.emptyList(), chatPage.getNumber(),
                     chatPage.getSize(), chatPage.getTotalElements(), chatPage.getTotalPages(), chatPage.isLast());
 
-        }else {
+        } else {
             pagedResponse = new PagedResponse<>(chatPage.stream().collect(Collectors.toList()), chatPage.getNumber(),
                     chatPage.getSize(), chatPage.getTotalElements(), chatPage.getTotalPages(), chatPage.isLast());
         }
@@ -84,12 +79,12 @@ public class ChatServiceImpl implements ChatService {
     }
 
     @Override
-    public void deleteChat(String chatId){
+    public void deleteChat(String chatId) {
         chatRepository.deleteChat(chatId);
     }
 
     @Override
-    public List<UserProfile> findUsersByChat(String chatId){
+    public List<UserProfile> findUsersByChat(String chatId) {
         return chatRepository.findUsersByChatId(chatId);
     }
 
