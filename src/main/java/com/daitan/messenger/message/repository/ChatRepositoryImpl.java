@@ -4,6 +4,8 @@ import com.daitan.messenger.constants.ConstantsUtils;
 import com.daitan.messenger.exception.UserNotFoundException;
 import com.daitan.messenger.message.model.Chat;
 import com.daitan.messenger.message.model.ChatResponse;
+import com.daitan.messenger.message.service.MessageService;
+import com.daitan.messenger.message.service.MessageServiceImpl;
 import com.daitan.messenger.users.model.User;
 import com.daitan.messenger.users.model.UserProfile;
 import com.daitan.messenger.users.service.UserService;
@@ -27,6 +29,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.hadoop.hbase.HbaseTemplate;
 
+import javax.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +47,14 @@ public class ChatRepositoryImpl implements ChatRepository {
     @Autowired
     private UserService userService;
 
-    private MessageRepository messageRepository;
+    @Autowired
+    private MessageRepositoryImpl messageRepository;
+
+
+    @PostConstruct
+    public void init() {
+        messageRepository.setChatRepository(this);
+    }
 
     @Override
     public void createChat(String chatName, String chatType, String... userId) {
@@ -187,8 +197,8 @@ public class ChatRepositoryImpl implements ChatRepository {
         List<Chat> chats;
         Pageable pageable = PageRequest.of(page, size);
         if (!Strings.isBlank(emitter) && !Strings.isBlank(receptor) && !Strings.isBlank(content)) {
-            String emitterId = userService.findByEmail(emitter).map(User::getId).orElseThrow(UserNotFoundException::new);
-            String receptorId = userService.findByEmail(receptor).map(User::getId).orElseThrow(UserNotFoundException::new);
+            String emitterId = userService.findByEmail(emitter).map(User::getId).orElse("");
+            String receptorId = userService.findByEmail(receptor).map(User::getId).orElse("");
             List<Chat> chatsFromEmitter = findChatByUserId(emitterId);
             List<Chat> chatsFromReceptor = findChatByUserId(receptorId);
             List<Chat> chatsFromContent = messageRepository.findMessageByContent(content).stream()

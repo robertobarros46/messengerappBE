@@ -63,6 +63,11 @@ public class WebConfiguration implements WebMvcConfigurer {
     }
 
     @Bean
+    MessageRepositoryImpl messageRepositoryImpl() {
+        return new MessageRepositoryImpl();
+    }
+
+    @Bean
     MessageRepository messageRepository() {
         return new MessageRepositoryImpl();
     }

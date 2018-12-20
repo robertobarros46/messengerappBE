@@ -3,6 +3,7 @@ package com.daitan.messenger.message.repository;
 import com.daitan.messenger.constants.ConstantsUtils;
 import com.daitan.messenger.message.model.Chat;
 import com.daitan.messenger.message.model.Message;
+import com.daitan.messenger.message.service.ChatService;
 import com.daitan.messenger.users.model.PagedResponse;
 import com.daitan.messenger.users.model.User;
 import com.daitan.messenger.users.service.UserService;
@@ -34,11 +35,14 @@ public class MessageRepositoryImpl implements MessageRepository {
     @Autowired
     private HbaseTemplate hbaseTemplate;
 
-    @Autowired
-    private ChatRepository chatRepository;
+    private ChatRepositoryImpl chatRepository;
 
     @Autowired
     private UserService userService;
+
+    public void setChatRepository(ChatRepositoryImpl chatRepository) {
+        this.chatRepository = chatRepository;
+    }
 
     @Override
     public void createMessage(Message message) {

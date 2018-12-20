@@ -174,7 +174,7 @@ public class UserController {
         }
     }
 
-    @PreAuthorize("hasRole('AUDITOR')")
+//    @PreAuthorize("hasRole('AUDITOR')")
     @RequestMapping(value = "/chats", method = RequestMethod.GET)
     public ResponseEntity<PagedResponse<ChatResponse>> findAllChats(
             @RequestParam(value = "emitter", defaultValue = ConstantsUtils.EMPTY_STRING) String emitter,
@@ -208,7 +208,7 @@ public class UserController {
         }
     }
 
-    @PreAuthorize("hasRole('AUDITOR')")
+//    @PreAuthorize("hasRole('AUDITOR')")
     @RequestMapping(value = "/chats/messages", method = RequestMethod.GET)
     public ResponseEntity<PagedResponse<Message>> findAllMessages(
             @RequestParam(value = "emitter", defaultValue = ConstantsUtils.EMPTY_STRING) String emitter,
